@@ -65,6 +65,13 @@ add_subdirectory(modules/clap-juce-extensions EXCLUDE_FROM_ALL)
 # This adds the melatonin inspector module
 add_subdirectory (modules/melatonin_inspector)
 
+# melatonin_audio_sparklines is a JUCE module (has its own module declaration) but ships
+# without a CMakeLists.txt wrapper, so register it directly rather than add_subdirectory
+juce_add_module("${CMAKE_CURRENT_SOURCE_DIR}/modules/melatonin_audio_sparklines")
+
+# Catch2 matchers/helpers for testing JUCE audio (silence/NaN/frequency checks etc), test-only
+add_subdirectory (modules/melatonin_test_helpers)
+
 # See `docs/CMake API.md` in the JUCE repo for all config options
 juce_add_plugin("${PROJECT_NAME}"
     # Icons for the standalone app
@@ -166,6 +173,13 @@ include(PamplejuceIPP)
 
 # Everything related to the tests target
 include(Tests)
+
+# melatonin_test_helpers: Catch2 matchers for JUCE audio (silence/NaN/frequency checks etc).
+# Added here (not in cmake/Tests.cmake) since that file lives in a third-party submodule we don't own.
+target_link_libraries(Tests PRIVATE Melatonin::TestHelpers)
+# melatonin_audio_sparklines is header-only with no CMake target of its own — just needs its
+# parent dir on the include path so <melatonin_audio_sparklines/...> resolves
+target_include_directories(Tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/modules)
 
 # A separate target for Benchmarks (keeps the Tests target fast)
 include(Benchmarks)
