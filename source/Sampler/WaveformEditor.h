@@ -6,7 +6,8 @@
 // Draws the loaded sample's waveform with four draggable markers (trim start/end,
 // loop start/end) and writes drags straight into the sound's atomics. Runs on the
 // message thread only; FlowSamplerVoice reads the same atomics from the audio thread.
-class WaveformEditor : public juce::Component
+// Also polls sound.currentPlaybackPosition on a timer to draw a live playhead.
+class WaveformEditor : public juce::Component, private juce::Timer
 {
 public:
     explicit WaveformEditor (FlowSamplerSound& soundToEdit);
@@ -17,6 +18,8 @@ public:
     void mouseMove (const juce::MouseEvent&) override;
 
 private:
+    void timerCallback() override { repaint(); }
+
     enum class Marker { none, trimStart, trimEnd, loopStart, loopEnd };
 
     // Keeps trimStart < trimEnd and loopStart/loopEnd inside [trimStart, trimEnd) after

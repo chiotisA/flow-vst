@@ -32,6 +32,16 @@ inline juce::Array<SampleEntry> buildTestCatalog()
     entries.add ({ catalogDir.getChildFile ("Guitar_D_145bpm.wav"), "Phantasia Guitar #17", "Guitar", "D", 145, true  });
     entries.add ({ catalogDir.getChildFile ("Synth_B_119bpm.wav"),  "Phantasia Synth #12",  "Synth",  "B", 119, false });
     entries.add ({ catalogDir.getChildFile ("Synth_D_128bpm.wav"),  "Phantasia Synth #16",  "Synth",  "D", 128, true  });
+
+    entries.add ({ catalogDir.getChildFile ("Riff_E_166bpm.wav"),        "Guitar Riff #1",        "Riff",      "E",     166, false });
+    entries.add ({ catalogDir.getChildFile ("Riff_D_135bpm.wav"),        "Guitar Riff #12",       "Riff",      "D",     135, true  });
+    entries.add ({ catalogDir.getChildFile ("Drums_125bpm.wav"),         "60's Drum Fill #1",     "Drums",     "-",     125, false });
+    entries.add ({ catalogDir.getChildFile ("Drums_96bpm.wav"),          "60's Drum Fill #1 (96)", "Drums",    "-",     96,  true  });
+    entries.add ({ catalogDir.getChildFile ("PsyGuitar_C_166bpm.wav"),   "Phantasia Psy Guitar #10", "PsyGuitar", "C",   166, false });
+    entries.add ({ catalogDir.getChildFile ("PsyGuitar_D_96bpm.wav"),    "Phantasia Psy Guitar #14", "PsyGuitar", "D",   96,  true  });
+    entries.add ({ catalogDir.getChildFile ("Brass_Dmin_130bpm.wav"),    "Phantasia Brass #10",   "Brass",     "Dmin",  130, false });
+    entries.add ({ catalogDir.getChildFile ("Brass_Gsmin_160bpm.wav"),   "Phantasia Brass #12",   "Brass",     "G#min", 160, true  });
+
     return entries;
 }
 
@@ -41,6 +51,13 @@ inline juce::Array<SampleEntry> buildTestCatalog()
 inline int keyToRootMidiNote (const juce::String& key)
 {
     static const juce::StringArray noteNames { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-    const auto index = noteNames.indexOf (key);
+
+    // Strip a trailing "min"/"maj" (e.g. brass loops tagged "Dmin", "G#min") — we only
+    // need the pitch class to place a root note, not the major/minor quality.
+    auto noteOnly = key.upToFirstOccurrenceOf ("min", false, true)
+                        .upToFirstOccurrenceOf ("maj", false, true)
+                        .trim();
+
+    const auto index = noteNames.indexOf (noteOnly);
     return 60 + juce::jmax (0, index);
 }

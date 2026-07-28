@@ -3,6 +3,7 @@
 WaveformEditor::WaveformEditor (FlowSamplerSound& soundToEdit) : sound (soundToEdit)
 {
     setInterceptsMouseClicks (true, false);
+    startTimerHz (30);
 }
 
 float WaveformEditor::sampleToX (int sample) const
@@ -163,4 +164,11 @@ void WaveformEditor::paint (juce::Graphics& g)
     drawMarker (sound.loopEnd.load(), juce::Colours::limegreen, "Loop Out", false);
     drawMarker (sound.trimStart.load(), juce::Colours::yellow, "Trim In", true);
     drawMarker (sound.trimEnd.load(), juce::Colours::yellow, "Trim Out", true);
+
+    const auto playbackPosition = sound.currentPlaybackPosition.load();
+    if (playbackPosition >= 0)
+    {
+        g.setColour (juce::Colours::white);
+        g.drawLine (sampleToX (playbackPosition), 0.0f, sampleToX (playbackPosition), bounds.getHeight(), 2.0f);
+    }
 }

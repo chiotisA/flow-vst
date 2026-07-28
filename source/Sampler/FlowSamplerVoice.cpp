@@ -32,6 +32,9 @@ void FlowSamplerVoice::stopNote (float /*velocity*/, bool allowTailOff)
     }
     else
     {
+        if (playingSound != nullptr)
+            playingSound->currentPlaybackPosition.store (-1);
+
         clearCurrentNote();
         playingSound = nullptr;
     }
@@ -101,9 +104,13 @@ void FlowSamplerVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, 
 
         if (isReleasing && releaseSamplesRemaining <= 0)
         {
+            playingSound->currentPlaybackPosition.store (-1);
             clearCurrentNote();
             playingSound = nullptr;
             break;
         }
     }
+
+    if (playingSound != nullptr)
+        playingSound->currentPlaybackPosition.store ((int) sourceSamplePosition);
 }

@@ -34,4 +34,10 @@ public:
     std::atomic<int> trimStart, trimEnd;
     std::atomic<int> loopStart, loopEnd;
     std::atomic<bool> loopingEnabled { true };
+
+    // Written by whichever FlowSamplerVoice is currently playing this sound, read by
+    // WaveformEditor's timer to draw a live playhead. -1 means "not currently playing".
+    // With overlapping notes the last voice to render in a block wins — fine for a
+    // debug-visualization feature, not a correctness-critical value.
+    std::atomic<int> currentPlaybackPosition { -1 };
 };
