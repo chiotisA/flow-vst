@@ -4,19 +4,34 @@
 
 // Holds one loaded sample's audio data and note-mapping range. Deliberately not
 // juce::SamplerSound: its data buffer is private (only its own SamplerVoice can read it),
-// and we need direct buffer access here for loop-point playback (added in a later step).
+// and we need direct buffer access here for loop-point playback.
+//
+// Trim/loop points are written from the editor (message thread) and read every sample
+// by FlowSamplerVoice (audio thread) — plain std::atomic<int>, no lock, since each is an
+// independent value and torn reads just mean a marker takes effect one block later.
 class FlowSamplerSound : public juce::SynthesiserSound
 {
 public:
     FlowSamplerSound (juce::AudioBuffer<float> audioData, double sourceSampleRateIn, int rootMidiNoteIn)
         : data (std::move (audioData)), sourceSampleRate (sourceSampleRateIn), rootMidiNote (rootMidiNoteIn)
     {
+        const auto numSamples = data.getNumSamples();
+        trimStart.store (0);
+        trimEnd.store (numSamples);
+        loopStart.store (0);
+        loopEnd.store (numSamples);
     }
 
     bool appliesToNote (int /*midiNoteNumber*/) override { return true; }
     bool appliesToChannel (int /*midiChannel*/) override { return true; }
 
+    int getNumSamples() const { return data.getNumSamples(); }
+
     const juce::AudioBuffer<float> data;
     const double sourceSampleRate;
     const int rootMidiNote;
+
+    std::atomic<int> trimStart, trimEnd;
+    std::atomic<int> loopStart, loopEnd;
+    std::atomic<bool> loopingEnabled { true };
 };

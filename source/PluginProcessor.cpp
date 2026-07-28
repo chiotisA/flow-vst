@@ -18,15 +18,12 @@ PluginProcessor::PluginProcessor()
     for (int i = 0; i < 8; ++i)
         synth.addVoice (new FlowSamplerVoice());
 
-    loadTestSample();
+    // Nothing loaded at startup — the catalog browser picks a sample. On a fresh clone
+    // or CI, test_samples/ (gitignored, real Beastsamples content) won't exist either way.
 }
 
-void PluginProcessor::loadTestSample()
+void PluginProcessor::loadSample (const juce::File& file, int rootMidiNote)
 {
-    // Temporary dev-only placeholder — proves the engine, not the real catalog loader.
-    // test_samples/ is gitignored (real Beastsamples content, not for public repo history),
-    // so this file won't exist on a fresh clone or CI — that's fine, just means no test tone.
-    auto file = juce::File (__FILE__).getParentDirectory().getSiblingFile ("test_samples").getChildFile ("test_sample.wav");
     std::unique_ptr<juce::AudioFormatReader> reader (formatManager.createReaderFor (file));
 
     if (reader == nullptr)
@@ -36,7 +33,18 @@ void PluginProcessor::loadTestSample()
     reader->read (&buffer, 0, buffer.getNumSamples(), 0, true, true);
 
     synth.clearSounds();
-    synth.addSound (new FlowSamplerSound (std::move (buffer), reader->sampleRate, 60));
+    synth.addSound (new FlowSamplerSound (std::move (buffer), reader->sampleRate, rootMidiNote));
+
+    if (onSampleLoaded)
+        onSampleLoaded();
+}
+
+FlowSamplerSound* PluginProcessor::getActiveSound() const
+{
+    if (synth.getNumSounds() == 0)
+        return nullptr;
+
+    return dynamic_cast<FlowSamplerSound*> (synth.getSound (0).get());
 }
 
 PluginProcessor::~PluginProcessor()

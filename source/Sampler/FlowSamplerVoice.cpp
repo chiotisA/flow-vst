@@ -11,7 +11,7 @@ void FlowSamplerVoice::startNote (int midiNoteNumber, float velocity, juce::Synt
     playingSound = dynamic_cast<FlowSamplerSound*> (sound);
     jassert (playingSound != nullptr);
 
-    sourceSamplePosition = 0.0;
+    sourceSamplePosition = (double) playingSound->trimStart.load();
     level = velocity;
     isReleasing = false;
 
@@ -53,12 +53,19 @@ void FlowSamplerVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, 
         return;
     }
 
+    // Snapshot the editable region once per block — a marker drag mid-block just takes
+    // effect on the next block, which is inaudible and keeps this lock-free.
+    const int trimEnd = juce::jlimit (1, sourceNumSamples, playingSound->trimEnd.load());
+    const bool isLooping = playingSound->loopingEnabled.load();
+    const int loopStart = juce::jlimit (0, trimEnd - 1, playingSound->loopStart.load());
+    const int loopEnd = juce::jlimit (loopStart + 1, trimEnd, playingSound->loopEnd.load());
+
     const int outputNumChannels = outputBuffer.getNumChannels();
 
     for (int i = 0; i < numSamples; ++i)
     {
-        const int pos0 = (int) sourceSamplePosition;
-        const int pos1 = (pos0 + 1) % sourceNumSamples;
+        const int pos0 = juce::jmin ((int) sourceSamplePosition, sourceNumSamples - 1);
+        const int pos1 = juce::jmin (pos0 + 1, sourceNumSamples - 1);
         const float frac = (float) (sourceSamplePosition - (double) pos0);
 
         float envelope = level;
@@ -79,8 +86,18 @@ void FlowSamplerVoice::renderNextBlock (juce::AudioBuffer<float>& outputBuffer, 
         }
 
         sourceSamplePosition += pitchRatio;
-        if (sourceSamplePosition >= sourceNumSamples)
-            sourceSamplePosition -= sourceNumSamples;
+
+        if (isLooping && sourceSamplePosition >= loopEnd)
+        {
+            sourceSamplePosition = loopStart + (sourceSamplePosition - loopEnd);
+        }
+        else if (! isReleasing && sourceSamplePosition >= trimEnd)
+        {
+            // Reached the end without looping (one-shot, or loop disabled) — fade out
+            // instead of cutting hard.
+            isReleasing = true;
+            releaseSamplesRemaining = releaseSamplesTotal;
+        }
 
         if (isReleasing && releaseSamplesRemaining <= 0)
         {

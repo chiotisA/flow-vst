@@ -41,9 +41,18 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-private:
-    void loadTestSample();
+    // Dev-only accessor for the waveform editor — the real browser/catalog data model
+    // (task 5+) replaces this "there's exactly one active sound at a time" assumption
+    // with proper pack/sample selection and multi-sample state.
+    class FlowSamplerSound* getActiveSound() const;
 
+    void loadSample (const juce::File& file, int rootMidiNote);
+
+    // Fires after loadSample() swaps in a new FlowSamplerSound, so the editor can rebuild
+    // its WaveformEditor to point at it.
+    std::function<void()> onSampleLoaded;
+
+private:
     juce::AudioFormatManager formatManager;
     juce::Synthesiser synth;
 
