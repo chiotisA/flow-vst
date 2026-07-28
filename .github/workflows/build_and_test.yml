@@ -36,16 +36,17 @@ jobs:
       fail-fast: false # show all errors for each platform (vs. cancel jobs on error)
       matrix:
         include:
-          # Windows-only for now — Flow targets Windows first (Standalone + VST3).
-          # Re-add Linux/macOS entries later if/when targeting those platforms:
+          # Linux still off for now — not a target platform.
           # - name: Linux
           #   os: ubuntu-22.04
           #   pluginval-binary: ./pluginval
           #   extra-flags: -G Ninja -DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld -DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld -DCMAKE_MODULE_LINKER_FLAGS=-fuse-ld=lld
-          # - name: macOS
-          #   os: macos-14
-          #   pluginval-binary: pluginval.app/Contents/MacOS/pluginval
-          #   extra-flags: -G Ninja -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          # macOS: build-only, unsigned. A friend notarizes/signs manually on his own Mac
+          # using his own script — CI just needs to produce the raw .vst3/.app.
+          - name: macOS
+            os: macos-14
+            pluginval-binary: pluginval.app/Contents/MacOS/pluginval
+            extra-flags: -G Ninja -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
           - name: Windows
             os: windows-latest
             pluginval-binary: ./pluginval.exe
@@ -125,64 +126,38 @@ jobs:
           7z x pluginval_${{ runner.os }}.zip
           ${{ matrix.pluginval-binary }} --strictness-level 10 --verbose --validate "${{ env.VST3_PATH }}"
 
-      - name: Import Certificates (macOS)
-        uses: sudara/basic-macos-keychain-action@v1
-        id: keychain
-        if: ${{ runner.os == 'macOS'}}
-        with:
-          dev-id-app-cert: ${{ secrets.DEV_ID_APP_CERT }}
-          dev-id-app-password: ${{ secrets.DEV_ID_APP_PASSWORD }}
-          dev-id-installer-cert: ${{ secrets.DEV_ID_INSTALLER_CERT }}
-          dev-id-installer-password: ${{ secrets.DEV_ID_INSTALLER_PASSWORD }}
+      # No Apple Developer certs in CI — a friend signs/notarizes manually on his own
+      # Mac using his own script. CI's job here is just to produce the raw, unsigned
+      # build for him to run that script against. Re-enable these if that changes:
+      # - name: Import Certificates (macOS)
+      #   uses: sudara/basic-macos-keychain-action@v1
+      #   id: keychain
+      #   if: ${{ runner.os == 'macOS'}}
+      #   with:
+      #     dev-id-app-cert: ${{ secrets.DEV_ID_APP_CERT }}
+      #     dev-id-app-password: ${{ secrets.DEV_ID_APP_PASSWORD }}
+      #     dev-id-installer-cert: ${{ secrets.DEV_ID_INSTALLER_CERT }}
+      #     dev-id-installer-password: ${{ secrets.DEV_ID_INSTALLER_PASSWORD }}
+      #
+      # - name: Codesign (macOS)
+      #   if: ${{ runner.os == 'macOS' }}
+      #   timeout-minutes: 5
+      #   run: |
+      #     codesign --force --keychain ${{ steps.keychain.outputs.keychain-path }} -s "${{ secrets.DEVELOPER_ID_APPLICATION}}" -v "${{ env.VST3_PATH }}" --deep --strict --options=runtime --timestamp
+      #     codesign --force --keychain ${{ steps.keychain.outputs.keychain-path }} -s "${{ secrets.DEVELOPER_ID_APPLICATION}}" -v "${{ env.STANDALONE_PATH }}" --deep --strict --options=runtime --timestamp
+      #
+      # - name: pkgbuild, Productbuild and Notarize
+      #   if: ${{ runner.os == 'macOS' }}
+      #   timeout-minutes: 5
+      #   run: |
+      #     pkgbuild --identifier "${{ env.BUNDLE_ID }}.vst3.pkg" --version $VERSION --component "${{ env.VST3_PATH }}" --install-location "/Library/Audio/Plug-Ins/VST3" "packaging/${{ env.PRODUCT_NAME }}.vst3.pkg"
+      #     xcrun notarytool submit "${{ env.ARTIFACT_NAME }}.pkg" --apple-id ${{ secrets.NOTARIZATION_USERNAME }} --password ${{ secrets.NOTARIZATION_PASSWORD }} --team-id ${{ secrets.TEAM_ID }} --wait
+      #     xcrun stapler staple "${{ env.ARTIFACT_NAME }}.pkg"
 
-      - name: Codesign (macOS)
+      - name: Zip (macOS)
         if: ${{ runner.os == 'macOS' }}
-        timeout-minutes: 5
-        run: |
-          # Each plugin must be code signed
-          codesign --force --keychain ${{ steps.keychain.outputs.keychain-path }} -s "${{ secrets.DEVELOPER_ID_APPLICATION}}" -v "${{ env.VST3_PATH }}" --deep --strict --options=runtime --timestamp
-          codesign --force --keychain ${{ steps.keychain.outputs.keychain-path }} -s "${{ secrets.DEVELOPER_ID_APPLICATION}}" -v "${{ env.AU_PATH }}" --deep --strict --options=runtime --timestamp
-          codesign --force --keychain ${{ steps.keychain.outputs.keychain-path }} -s "${{ secrets.DEVELOPER_ID_APPLICATION}}" -v "${{ env.CLAP_PATH }}" --deep --strict --options=runtime --timestamp
-          codesign --force --keychain ${{ steps.keychain.outputs.keychain-path }} -s "${{ secrets.DEVELOPER_ID_APPLICATION}}" -v "${{ env.STANDALONE_PATH }}" --deep --strict --options=runtime --timestamp
-
-      - name: Add Custom Icons (macOS)
-        if: ${{ runner.os == 'macOS' }}
-        run: |
-          # add the icns as its own icon resource (meta!)
-          sips -i packaging/pamplejuce.icns
-
-          # Grab the resource, put in tempfile
-          DeRez -only icns packaging/pamplejuce.icns > /tmp/icons
-
-          # Stuff the resource into the strange Icon? file's resource fork
-          Rez -a /tmp/icons -o "${{ env.VST3_PATH }}/Icon"$'\r'
-          Rez -a /tmp/icons -o "${{ env.AU_PATH }}/Icon"$'\r'
-          Rez -a /tmp/icons -o "${{ env.CLAP_PATH }}/Icon"$'\r'
-
-          # Set custom icon attribute
-          SetFile -a C "${{ env.VST3_PATH }}"
-          SetFile -a C "${{ env.AU_PATH }}"
-          SetFile -a C "${{ env.CLAP_PATH }}"
-
-      - name: pkgbuild, Productbuild and Notarize
-        if: ${{ runner.os == 'macOS' }}
-        timeout-minutes: 5
-        run: |
-          pkgbuild --identifier "${{ env.BUNDLE_ID }}.au.pkg" --version $VERSION --component "${{ env.AU_PATH }}" --install-location "/Library/Audio/Plug-Ins/Components"  "packaging/${{ env.PRODUCT_NAME }}.au.pkg"
-          pkgbuild --identifier "${{ env.BUNDLE_ID }}.vst3.pkg" --version $VERSION --component "${{ env.VST3_PATH }}" --install-location "/Library/Audio/Plug-Ins/VST3" "packaging/${{ env.PRODUCT_NAME }}.vst3.pkg"
-          pkgbuild --identifier "${{ env.BUNDLE_ID }}.clap.pkg" --version $VERSION --component "${{ env.CLAP_PATH }}" --install-location "/Library/Audio/Plug-Ins/CLAP" "packaging/${{ env.PRODUCT_NAME }}.clap.pkg"
-
-          # Standalone is special, needs a boolean to always install in /Applications
-          pkgbuild --analyze --root "$(dirname "${{ env.STANDALONE_PATH }}")" standalone.plist
-          plutil -replace BundleIsRelocatable -bool NO standalone.plist
-          pkgbuild --identifier "${{ env.BUNDLE_ID }}.app.pkg" --version $VERSION --root "$(dirname "${{ env.STANDALONE_PATH }}")" --component-plist standalone.plist --install-location "/Applications" "packaging/${{ env.PRODUCT_NAME }}.app.pkg"
-
-          cd packaging
-          envsubst < distribution.xml.template > distribution.xml
-          productbuild --resources ./resources --distribution distribution.xml --sign "${{ secrets.DEVELOPER_ID_INSTALLER }}" --timestamp "${{ env.ARTIFACT_NAME }}.pkg"
-
-          xcrun notarytool submit "${{ env.ARTIFACT_NAME }}.pkg" --apple-id ${{ secrets.NOTARIZATION_USERNAME }} --password ${{ secrets.NOTARIZATION_PASSWORD }} --team-id ${{ secrets.TEAM_ID }} --wait
-          xcrun stapler staple "${{ env.ARTIFACT_NAME }}.pkg"
+        working-directory: ${{ env.ARTIFACTS_PATH }}
+        run: 7z a -tzip "${{ env.ARTIFACT_NAME }}-unsigned.zip" VST3 Standalone
 
       - name: Zip
         if: ${{ runner.os == 'Linux' }}
@@ -224,12 +199,12 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}.zip
           path: "${{ env.ARTIFACTS_PATH }}/${{ env.ARTIFACT_NAME }}.zip"
 
-      - name: Upload pkg (macOS)
+      - name: Upload Zip (macOS, unsigned)
         if: ${{ runner.os == 'macOS' }}
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.ARTIFACT_NAME }}.pkg
-          path: packaging/${{ env.ARTIFACT_NAME }}.pkg
+          name: ${{ env.ARTIFACT_NAME }}-unsigned.zip
+          path: "${{ env.ARTIFACTS_PATH }}/${{ env.ARTIFACT_NAME }}-unsigned.zip"
 
   release:
     if: contains(github.ref, 'tags/v')
