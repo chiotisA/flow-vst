@@ -56,8 +56,11 @@ include(PamplejuceLog)
 # On Github Actions, this is done as a part of actions/checkout
 add_subdirectory(JUCE)
 
-# Add CLAP format
-add_subdirectory(modules/clap-juce-extensions EXCLUDE_FROM_ALL)
+# CLAP support dropped: clap-juce-extensions (even its latest upstream commit) calls
+# juce::detail::PluginUtilities::getDesktopFlags(), which JUCE 9.0.0 removed/merged into
+# getDesktopFlagsAndWindowsMultiTouchMode() — an unfixed upstream incompatibility, and
+# CLAP isn't a format Beastsamples ships anywhere, so not worth blocking on.
+# add_subdirectory(modules/clap-juce-extensions EXCLUDE_FROM_ALL)
 
 # Add any other modules you want modules here, before the juce_add_plugin call
 # juce_add_module(modules/my_module)
@@ -105,9 +108,9 @@ juce_add_plugin("${PROJECT_NAME}"
 # Without running into ODR violations
 add_library(SharedCode INTERFACE)
 
-clap_juce_extensions_plugin(TARGET "${PROJECT_NAME}"
-    CLAP_ID "${BUNDLE_ID}"
-    CLAP_FEATURES audio-effect)
+# clap_juce_extensions_plugin(TARGET "${PROJECT_NAME}"
+#     CLAP_ID "${BUNDLE_ID}"
+#     CLAP_FEATURES audio-effect)
 
 # Enable fast math, C++20 and a few other target defaults
 include(SharedCodeDefaults)
