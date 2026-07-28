@@ -1,6 +1,9 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_audio_formats/juce_audio_formats.h>
+
+#include "Sampler/FlowSamplerVoice.h"
 
 #if (MSVC)
 #include "ipps.h"
@@ -39,5 +42,10 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
 private:
+    void loadTestSample();
+
+    juce::AudioFormatManager formatManager;
+    juce::Synthesiser synth;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
 };

@@ -98,6 +98,10 @@ juce_add_plugin("${PROJECT_NAME}"
     PLUGIN_CODE Flow
     FORMATS "${FORMATS}"
 
+    # Flow is a sampler: generates audio from MIDI, no audio input needed
+    IS_SYNTH TRUE
+    NEEDS_MIDI_INPUT TRUE
+
     # The name of your final executable
     # This is how it's listed in the DAW
     # This can be different from PROJECT_NAME and can have spaces!
@@ -160,6 +164,7 @@ target_link_libraries(SharedCode
     Assets
     melatonin_inspector
     juce_audio_utils
+    juce_audio_formats
     juce_audio_processors
     juce_dsp
     juce_gui_basics

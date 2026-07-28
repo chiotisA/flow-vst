@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "Sampler/FlowSamplerSound.h"
 
 //==============================================================================
 PluginProcessor::PluginProcessor()
@@ -12,6 +13,30 @@ PluginProcessor::PluginProcessor()
                      #endif
                        )
 {
+    formatManager.registerBasicFormats();
+
+    for (int i = 0; i < 8; ++i)
+        synth.addVoice (new FlowSamplerVoice());
+
+    loadTestSample();
+}
+
+void PluginProcessor::loadTestSample()
+{
+    // Temporary dev-only placeholder — proves the engine, not the real catalog loader.
+    // test_samples/ is gitignored (real Beastsamples content, not for public repo history),
+    // so this file won't exist on a fresh clone or CI — that's fine, just means no test tone.
+    auto file = juce::File (__FILE__).getParentDirectory().getSiblingFile ("test_samples").getChildFile ("test_sample.wav");
+    std::unique_ptr<juce::AudioFormatReader> reader (formatManager.createReaderFor (file));
+
+    if (reader == nullptr)
+        return;
+
+    juce::AudioBuffer<float> buffer ((int) reader->numChannels, (int) reader->lengthInSamples);
+    reader->read (&buffer, 0, buffer.getNumSamples(), 0, true, true);
+
+    synth.clearSounds();
+    synth.addSound (new FlowSamplerSound (std::move (buffer), reader->sampleRate, 60));
 }
 
 PluginProcessor::~PluginProcessor()
@@ -86,9 +111,8 @@ void PluginProcessor::changeProgramName (int index, const juce::String& newName)
 //==============================================================================
 void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
-    juce::ignoreUnused (sampleRate, samplesPerBlock);
+    juce::ignoreUnused (samplesPerBlock);
+    synth.setCurrentPlaybackSampleRate (sampleRate);
 }
 
 void PluginProcessor::releaseResources()
@@ -122,33 +146,12 @@ bool PluginProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer& midiMessages)
 {
-    juce::ignoreUnused (midiMessages);
-
     juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
+    // Synthesiser voices add into the buffer, so it must start silent.
+    buffer.clear();
 
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
-    {
-        auto* channelData = buffer.getWritePointer (channel);
-        juce::ignoreUnused (channelData);
-        // ..do something to the data...
-    }
+    synth.renderNextBlock (buffer, midiMessages, 0, buffer.getNumSamples());
 }
 
 //==============================================================================

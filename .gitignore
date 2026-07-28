@@ -28,3 +28,8 @@ cmake-build-debug
 cmake-build-release
 cmake-build-relwithdebinfo
 packaging/Output/*
+
+# Local dev-only test audio (real Beastsamples content, not for public repo history;
+# the real catalog delivery system replaces this — see FlowSamplerSound/loadTestSample)
+test_samples/*
+!test_samples/.gitkeep
