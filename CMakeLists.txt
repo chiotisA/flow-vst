@@ -35,8 +35,9 @@ set(BUNDLE_ID "com.beastsamples.flow")
 
 # Change me! Set the plugin formats you want built
 # Valid choices: AAX Unity VST VST3 AU AUv3 Standalone
-# Windows-first: AU/AUv3 dropped for now, add back if/when targeting macOS
-set(FORMATS Standalone VST3)
+# AU only actually builds on macOS — JUCE skips it automatically elsewhere, so this
+# is safe to list even though we're primarily on Windows right now.
+set(FORMATS Standalone VST3 AU)
 
 # Force JUCE to work with sccache
 # instruct MSVC to embed debug info (/Z7) instead of emitting a .pdb

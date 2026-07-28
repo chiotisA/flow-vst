@@ -157,7 +157,7 @@ jobs:
       - name: Zip (macOS)
         if: ${{ runner.os == 'macOS' }}
         working-directory: ${{ env.ARTIFACTS_PATH }}
-        run: 7z a -tzip "${{ env.ARTIFACT_NAME }}-unsigned.zip" VST3 Standalone
+        run: 7z a -tzip "${{ env.ARTIFACT_NAME }}-unsigned.zip" VST3 AU Standalone
 
       - name: Zip
         if: ${{ runner.os == 'Linux' }}
