@@ -34,6 +34,7 @@ packaging/Output/*
 test_samples/*
 !test_samples/.gitkeep
 
-# Catalog scan output lists real pack/file names from the commercial catalog — not for
-# public repo history. The scanning script itself (tools/catalog-scan.js) is safe/generic.
+# Catalog scan/review output lists real pack/file names from the commercial catalog — not
+# for public repo history. The scripts themselves (tools/*.js) are safe/generic.
 tools/*.csv
+tools/catalog-manual-review.md

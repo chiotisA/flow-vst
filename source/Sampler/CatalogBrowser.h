@@ -33,9 +33,19 @@ private:
 
     juce::TextButton loopsTabButton { "Loops" };
     juce::TextButton oneShotsTabButton { "One-Shots" };
+
+    // Category/Key/BPM are separate structured filters, deliberately pulled out of the
+    // free-text search box — searching a key like "D" as loose substring text would match
+    // almost any name/category containing that letter (e.g. "Drums"), not just samples
+    // actually in the key of D.
+    juce::ComboBox categoryFilterBox;
+    juce::ComboBox keyFilterBox;
+    juce::TextEditor bpmMinBox, bpmMaxBox;
+
     juce::TextEditor searchBox;
     juce::ListBox listBox { "Catalog", this };
 
     static constexpr int starColumnWidth = 24;
     static constexpr int tabRowHeight = 26;
+    static constexpr int filterRowHeight = 26;
 };
