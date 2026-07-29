@@ -69,6 +69,10 @@ function walkWav (dir, fileList)
 // - categoryOverrides: [{ contains, category }] — a pack's default category isn't always
 //   right for every subfolder (e.g. a "Bass" subfolder bundled inside a drum kit is real
 //   Bass one-shot content, not a Drums subtype) — checked before falling back to `category`
+// - regions: [{ contains, category, mode, exclude }] — for packs that are genuinely
+//   multi-category with no single fallback (PHANTASIA, Percs & Folleys). Checked in order,
+//   first match wins; `exclude: true` drops the file entirely (e.g. PHANTASIA's Brass).
+//   A pack with `regions` has no top-level category/mode of its own.
 const APPROVED_PACKS = {
     'Analog Drums by Beatsamples':                    { category: 'Drums', mode: 'OneShot', categoryOverrides: [ { contains: 'bass', category: 'Bass' } ] },
     'Analog Synths by Beastsamples':                  { category: 'Synth', mode: 'Loop' },
@@ -93,6 +97,46 @@ const APPROVED_PACKS = {
     'Lines Synths by Beastsamples':                   { category: 'Synth', mode: 'Loop' },
     'Liquid Guitars by Beastsamples':                 { category: 'Guitar', mode: 'Loop', onlyIfPathContains: 'wet' },
     'Lo-fi Keys by Beastsamples':                     { category: 'Keys',  mode: 'Loop' },
+    'Mood Guitar Samples  FREE by Beastsamples':       { category: 'Guitar', mode: 'Loop' },
+    'Native Synths by Beastsamples':                  { category: 'Synth', mode: 'Loop' },
+    'Phonk Drumloops by Beastsamples':                 { category: 'Drums', mode: 'Loop' },
+    'Phonk Melodies by Beastsamples':                 { category: 'Synth', mode: 'Loop' },
+    'Phonk Samples Vol_I by Beastsamples':            { category: 'Synth', mode: 'Loop' },
+    'Phonk Samples Vol_II by Beastsamples':           { category: 'Synth', mode: 'Loop' },
+
+    // PHANTASIA — genuinely multi-category, no single fallback. Brass excluded per user
+    // (no home in Guitar/Synth/Bass/Drums/Keys yet — see project-flow-catalog-ux-design
+    // memory's "third category gap"). "guitar wavs" also matches inside "psy guitar wavs"
+    // paths, but both map to the same category so match order doesn't matter here.
+    'PHANTASIA by Beastsamples': {
+        regions: [
+            { contains: 'bass wavs',        category: 'Bass',   mode: 'Loop' },
+            { contains: 'guitar wavs',      category: 'Guitar', mode: 'Loop' },
+            { contains: 'synth wavs',       category: 'Synth',  mode: 'Loop' },
+            { contains: 'brass melodies',   exclude: true },
+        ],
+    },
+
+    // Percs & Folleys — Loops/One-Shots are explicit top-level folders (the actual Mode
+    // signal, not guessed from subfolder keywords), with Category subfolders underneath.
+    'Percs & Folleys by Beastsamples': {
+        regions: [
+            { contains: 'loops/aiffs/bass',              category: 'Bass',   mode: 'Loop' },
+            { contains: 'loops/wavs/bass',                category: 'Bass',   mode: 'Loop' },
+            { contains: 'loops/aiffs/guitar',            category: 'Guitar', mode: 'Loop' },
+            { contains: 'loops/wavs/guitar',              category: 'Guitar', mode: 'Loop' },
+            { contains: 'loops/aiffs/synth',              category: 'Synth',  mode: 'Loop' },
+            { contains: 'loops/wavs/synth',                category: 'Synth',  mode: 'Loop' },
+            { contains: 'loops/aiffs/hits-hats-percs',    category: 'Drums',  mode: 'Loop' },
+            { contains: 'loops/wavs/hits-hats-percs',      category: 'Drums',  mode: 'Loop' },
+            { contains: 'loops/aiffs/kicks',              category: 'Drums',  mode: 'Loop' },
+            { contains: 'loops/wavs/kicks',                category: 'Drums',  mode: 'Loop' },
+            { contains: 'loops/aiffs/snares-percs',       category: 'Drums',  mode: 'Loop' },
+            { contains: 'loops/wavs/snares-percs',         category: 'Drums',  mode: 'Loop' },
+            { contains: 'one-shots',                      category: 'Drums',  mode: 'OneShot' },
+            { contains: 'bonus',                          category: 'Drums',  mode: 'Loop' },
+        ],
+    },
 };
 
 function main()
@@ -124,24 +168,49 @@ function main()
         for (const filePath of files)
         {
             const relativePath = path.relative (packPath, filePath);
-            const relativeLower = relativePath.toLowerCase();
+            // Normalize to forward slashes so region "contains" patterns like
+            // 'loops/wavs/bass' match regardless of platform path separator.
+            const relativeLower = relativePath.toLowerCase().split (path.sep).join ('/');
 
-            if (rules.excludeIfPathContains && rules.excludeIfPathContains.some (s => relativeLower.includes (s)))
+            let category, mode;
+
+            if (rules.regions)
             {
-                skippedByRuleCount++;
-                continue;
+                const region = rules.regions.find (r => relativeLower.includes (r.contains));
+                if (! region)
+                {
+                    console.error (`WARNING: no region matched for "${packName}" file: ${relativePath} — skipping.`);
+                    skippedByRuleCount++;
+                    continue;
+                }
+                if (region.exclude)
+                {
+                    skippedByRuleCount++;
+                    continue;
+                }
+                category = region.category;
+                mode = region.mode;
             }
-            if (rules.onlyIfPathContains && ! relativeLower.includes (rules.onlyIfPathContains))
+            else
             {
-                skippedByRuleCount++;
-                continue;
+                if (rules.excludeIfPathContains && rules.excludeIfPathContains.some (s => relativeLower.includes (s)))
+                {
+                    skippedByRuleCount++;
+                    continue;
+                }
+                if (rules.onlyIfPathContains && ! relativeLower.includes (rules.onlyIfPathContains))
+                {
+                    skippedByRuleCount++;
+                    continue;
+                }
+
+                mode = rules.mode === 'inferFromPath' ? inferModeFromPath (relativeLower) : rules.mode;
+
+                const override = rules.categoryOverrides && rules.categoryOverrides.find (o => relativeLower.includes (o.contains));
+                category = override ? override.category : rules.category;
             }
 
-            const mode = rules.mode === 'inferFromPath' ? inferModeFromPath (relativeLower) : rules.mode;
             const { key, bpm } = extractKeyAndBpm (path.basename (filePath));
-
-            const override = rules.categoryOverrides && rules.categoryOverrides.find (o => relativeLower.includes (o.contains));
-            const category = override ? override.category : rules.category;
 
             const destRelative = path.join (packName, relativePath);
             const destPath = path.join (CATALOG_DIR, destRelative);
