@@ -15,7 +15,7 @@ void FlowSamplerVoice::startNote (int midiNoteNumber, float velocity, juce::Synt
     level = velocity;
     isReleasing = false;
 
-    const auto semitones = midiNoteNumber - playingSound->rootMidiNote;
+    const auto semitones = midiNoteNumber - playingSound->rootMidiNote.load();
     pitchRatio = std::pow (2.0, semitones / 12.0) * playingSound->sourceSampleRate / getSampleRate();
 
     constexpr double releaseTimeSeconds = 0.05;

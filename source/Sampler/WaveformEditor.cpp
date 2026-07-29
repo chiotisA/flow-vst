@@ -4,6 +4,45 @@ WaveformEditor::WaveformEditor (FlowSamplerSound& soundToEdit) : sound (soundToE
 {
     setInterceptsMouseClicks (true, false);
     startTimerHz (30);
+
+    rootNoteLabel.setColour (juce::Label::textColourId, juce::Colours::white);
+    addAndMakeVisible (rootNoteLabel);
+
+    // Clamp to the valid MIDI range rather than wrapping — wrapping octave 9 back down
+    // to octave 0 on one more click would be a surprising, easy-to-trigger UI trap.
+    octaveDownButton.onClick = [this]
+    {
+        const auto note = sound.rootMidiNote.load();
+        if (note - 12 >= 0)
+            sound.rootMidiNote.store (note - 12);
+        updateRootNoteLabel();
+    };
+    octaveUpButton.onClick = [this]
+    {
+        const auto note = sound.rootMidiNote.load();
+        if (note + 12 <= 127)
+            sound.rootMidiNote.store (note + 12);
+        updateRootNoteLabel();
+    };
+    addAndMakeVisible (octaveDownButton);
+    addAndMakeVisible (octaveUpButton);
+
+    updateRootNoteLabel();
+}
+
+void WaveformEditor::updateRootNoteLabel()
+{
+    const auto note = sound.rootMidiNote.load();
+    rootNoteLabel.setText ("Root: " + juce::MidiMessage::getMidiNoteName (note, true, true, 3),
+                            juce::dontSendNotification);
+}
+
+void WaveformEditor::resized()
+{
+    auto strip = getLocalBounds().removeFromTop (controlStripHeight);
+    octaveUpButton.setBounds (strip.removeFromRight (70));
+    octaveDownButton.setBounds (strip.removeFromRight (70));
+    rootNoteLabel.setBounds (strip);
 }
 
 float WaveformEditor::sampleToX (int sample) const
@@ -46,6 +85,15 @@ WaveformEditor::Marker WaveformEditor::findMarkerNear (float x) const
 
 void WaveformEditor::mouseDown (const juce::MouseEvent& e)
 {
+    // The control strip's own children (label/buttons) normally consume their clicks
+    // before this ever runs, but the label doesn't intercept clicks — without this guard,
+    // clicking it while it happens to sit above a marker's x-column would start a drag.
+    if (e.position.y < (float) controlStripHeight)
+    {
+        draggingMarker = Marker::none;
+        return;
+    }
+
     draggingMarker = findMarkerNear ((float) e.position.x);
 }
 
@@ -111,7 +159,7 @@ void WaveformEditor::mouseMove (const juce::MouseEvent& e)
 
 void WaveformEditor::paint (juce::Graphics& g)
 {
-    auto bounds = getLocalBounds().toFloat();
+    auto bounds = getLocalBounds().toFloat().withTrimmedTop ((float) controlStripHeight);
     g.setColour (juce::Colours::black);
     g.fillRect (bounds);
 
@@ -150,10 +198,10 @@ void WaveformEditor::paint (juce::Graphics& g)
     {
         const auto x = sampleToX (sample);
         g.setColour (colour);
-        g.drawLine (x, 0.0f, x, bounds.getHeight(), 2.0f);
+        g.drawLine (x, bounds.getY(), x, bounds.getBottom(), 2.0f);
 
         g.setFont (12.0f);
-        const auto labelY = labelAbove ? 2.0f : bounds.getHeight() - 16.0f;
+        const auto labelY = labelAbove ? bounds.getY() + 2.0f : bounds.getBottom() - 16.0f;
         const auto labelWidth = 70.0f;
         // Keep the label from running off either edge of the component.
         const auto labelX = juce::jlimit (0.0f, bounds.getWidth() - labelWidth, x - labelWidth * 0.5f);
@@ -169,6 +217,6 @@ void WaveformEditor::paint (juce::Graphics& g)
     if (playbackPosition >= 0)
     {
         g.setColour (juce::Colours::white);
-        g.drawLine (sampleToX (playbackPosition), 0.0f, sampleToX (playbackPosition), bounds.getHeight(), 2.0f);
+        g.drawLine (sampleToX (playbackPosition), bounds.getY(), sampleToX (playbackPosition), bounds.getBottom(), 2.0f);
     }
 }

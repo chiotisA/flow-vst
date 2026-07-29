@@ -13,12 +13,14 @@ public:
     explicit WaveformEditor (FlowSamplerSound& soundToEdit);
 
     void paint (juce::Graphics&) override;
+    void resized() override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseMove (const juce::MouseEvent&) override;
 
 private:
     void timerCallback() override { repaint(); }
+    void updateRootNoteLabel();
 
     enum class Marker { none, trimStart, trimEnd, loopStart, loopEnd };
 
@@ -34,5 +36,13 @@ private:
     FlowSamplerSound& sound;
     Marker draggingMarker = Marker::none;
 
+    // Root note starts at a fixed default octave from the catalog's key tag — no pitch
+    // detection (dropped as unreliable on drums/FX/noisy content). These just relocate it
+    // by a full octave at a time, e.g. down to A1 for a bass one-shot, entirely by ear.
+    juce::Label rootNoteLabel;
+    juce::TextButton octaveDownButton { "Octave -" };
+    juce::TextButton octaveUpButton { "Octave +" };
+
     static constexpr int grabRadius = 6;
+    static constexpr int controlStripHeight = 24;
 };

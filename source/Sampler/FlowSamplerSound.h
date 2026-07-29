@@ -29,7 +29,12 @@ public:
 
     const juce::AudioBuffer<float> data;
     const double sourceSampleRate;
-    const int rootMidiNote;
+
+    // Starts at a fixed default octave derived from the catalog's key tag (no pitch
+    // detection — deliberately dropped, unreliable on drums/FX/noisy content). Mutable so
+    // the user can relocate it by octave (e.g. down to A1 for a bass one-shot) to wherever
+    // it actually belongs by ear.
+    std::atomic<int> rootMidiNote;
 
     std::atomic<int> trimStart, trimEnd;
     std::atomic<int> loopStart, loopEnd;
