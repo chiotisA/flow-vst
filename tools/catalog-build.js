@@ -47,6 +47,50 @@ function extractKeyAndBpm (filename)
     return { key, bpm };
 }
 
+// Real filenames are things like "#10_Bass_A_Analog Drums_Beastsamples" or
+// "Beastsamples - Classic Guitars - A - 116 - BPM" — an index number, "Beastsamples," and
+// the key/BPM all repeated verbatim even though key/BPM already show as separate fields in
+// the browser row. Strips all of that down to just the meaningful words, tidies separators.
+// Token-based, not regex-with-\b — underscore counts as a "word" character in JS regex,
+// so \b never fires between "_" and a letter (e.g. "_A_" was leaking "A" through when this
+// was tried as a \b-based regex). Splitting into tokens first sidesteps that entirely.
+function cleanDisplayName (rawBasename)
+{
+    const tokens = rawBasename.split (/[\s_\-.]+/).filter (Boolean);
+    const kept = [];
+    let indexNumber = '';
+
+    for (let i = 0; i < tokens.length; ++i)
+    {
+        const t = tokens[i];
+
+        if (i === 0 && /^#\d+$/.test (t))
+        {
+            // Kept, but moved to the end ("Name #10") rather than dropped — a numbered
+            // series (e.g. 50 Analog Drums bass hits) would otherwise all show the exact
+            // same name with nothing to tell them apart in the list.
+            indexNumber = t;
+            continue;
+        }
+        if (/^beast?samples$/i.test (t))
+            continue;
+        if (/^\d{2,3}bpm$/i.test (t))
+            continue;
+        if (/^bpm$/i.test (t))
+            continue;
+        if (/^\d{2,3}$/.test (t) && tokens[i + 1] && /^bpm$/i.test (tokens[i + 1]))
+            continue; // the "125" half of a separate "125" "BPM" pair
+        if (NOTE_TOKEN.test (t))
+            continue; // bare key token: A, C#, Dmin, G#min...
+
+        kept.push (t);
+    }
+
+    const name = kept.join (' ').trim();
+    const withIndex = indexNumber ? (name.length > 0 ? `${name} ${indexNumber}` : indexNumber) : name;
+    return withIndex.length > 0 ? withIndex : rawBasename;
+}
+
 function walkWav (dir, fileList)
 {
     for (const entry of fs.readdirSync (dir, { withFileTypes: true }))
@@ -220,7 +264,7 @@ function main()
 
             manifest.push ({
                 file: destRelative.split (path.sep).join ('/'),
-                name: path.basename (filePath, '.wav'),
+                name: cleanDisplayName (path.basename (filePath, '.wav')),
                 pack: packName,
                 category,
                 mode,
