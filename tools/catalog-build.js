@@ -66,8 +66,11 @@ function walkWav (dir, fileList)
 //   one of these is skipped entirely (Guitar Tools' Tools/Wah-Wah subfolders)
 // - onlyIfPathContains: if set, ONLY files whose relative path contains this substring
 //   are included (Liquid Guitars — just the Wet stems)
+// - categoryOverrides: [{ contains, category }] — a pack's default category isn't always
+//   right for every subfolder (e.g. a "Bass" subfolder bundled inside a drum kit is real
+//   Bass one-shot content, not a Drums subtype) — checked before falling back to `category`
 const APPROVED_PACKS = {
-    'Analog Drums by Beatsamples':                    { category: 'Drums', mode: 'OneShot' },
+    'Analog Drums by Beatsamples':                    { category: 'Drums', mode: 'OneShot', categoryOverrides: [ { contains: 'bass', category: 'Bass' } ] },
     'Analog Synths by Beastsamples':                  { category: 'Synth', mode: 'Loop' },
     'Analog Synths Collection FIDIA':                 { category: 'Synth', mode: 'inferFromPath' },
     'Bass Mellow Grooves by Beastsamples':            { category: 'Bass',  mode: 'Loop' },
@@ -137,6 +140,9 @@ function main()
             const mode = rules.mode === 'inferFromPath' ? inferModeFromPath (relativeLower) : rules.mode;
             const { key, bpm } = extractKeyAndBpm (path.basename (filePath));
 
+            const override = rules.categoryOverrides && rules.categoryOverrides.find (o => relativeLower.includes (o.contains));
+            const category = override ? override.category : rules.category;
+
             const destRelative = path.join (packName, relativePath);
             const destPath = path.join (CATALOG_DIR, destRelative);
             fs.mkdirSync (path.dirname (destPath), { recursive: true });
@@ -147,7 +153,7 @@ function main()
                 file: destRelative.split (path.sep).join ('/'),
                 name: path.basename (filePath, '.wav'),
                 pack: packName,
-                category: rules.category,
+                category,
                 mode,
                 key,
                 bpm: bpm ? parseInt (bpm, 10) : 0,
