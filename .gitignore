@@ -33,3 +33,7 @@ packaging/Output/*
 # the real catalog delivery system replaces this — see FlowSamplerSound/loadTestSample)
 test_samples/*
 !test_samples/.gitkeep
+
+# Catalog scan output lists real pack/file names from the commercial catalog — not for
+# public repo history. The scanning script itself (tools/catalog-scan.js) is safe/generic.
+tools/*.csv
