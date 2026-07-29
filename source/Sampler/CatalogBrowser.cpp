@@ -155,9 +155,23 @@ void CatalogBrowser::paintListBoxItem (int rowNumber, juce::Graphics& g, int wid
     g.setColour (entry.locked ? juce::Colours::grey : juce::Colours::white);
     g.setFont (13.0f);
 
-    auto label = entry.name + "  [" + entry.category + " - " + entry.key
-               + (entry.bpm > 0 ? " - " + juce::String (entry.bpm) + " bpm]" : "]")
-               + (entry.locked ? "  (locked)" : "");
+    // Category is dropped from the bracket when a specific Category filter is active —
+    // repeating "Guitar" on every single row when you've already filtered to Guitar is
+    // pure redundant clutter, especially in this narrow a panel. Empty Key/BPM are
+    // dropped entirely too, rather than showing hanging "- -" gaps.
+    juce::StringArray infoParts;
+    if (categoryFilterBox.getSelectedId() <= 1)
+        infoParts.add (entry.category);
+    if (entry.key.isNotEmpty())
+        infoParts.add (entry.key);
+    if (entry.bpm > 0)
+        infoParts.add (juce::String (entry.bpm) + "bpm");
+
+    auto label = entry.name;
+    if (! infoParts.isEmpty())
+        label += "  [" + infoParts.joinIntoString (" \xC2\xB7 ") + "]";
+    if (entry.locked)
+        label += "  (locked)";
     g.drawText (label, textArea.reduced (4, 0), juce::Justification::centredLeft, true);
 }
 

@@ -84,6 +84,8 @@ function cleanDisplayName (rawBasename)
             continue; // the "125" half of a separate "125" "BPM" pair
         if (NOTE_TOKEN.test (t))
             continue; // bare key token: A, C#, Dmin, G#min...
+        if (/^(in|at)$/i.test (t))
+            continue; // dangling preposition left over once the key it pointed to is gone
 
         kept.push (t);
     }
