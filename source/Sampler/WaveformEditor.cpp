@@ -165,27 +165,48 @@ void WaveformEditor::paint (juce::Graphics& g)
 
     const auto& data = sound.data;
     const int numSamples = data.getNumSamples();
+    const int numChannels = data.getNumChannels();
 
     if (numSamples > 0)
     {
         g.setColour (juce::Colours::orange);
-        const auto* channelData = data.getReadPointer (0);
         const int width = getWidth();
-        const float midY = bounds.getCentreY();
 
-        for (int x = 0; x < width; ++x)
+        // Stereo files get two stacked lanes (top = left, bottom = right) — the standard
+        // DAW convention — instead of only ever drawing channel 0 and silently discarding
+        // the second channel, which made stereo content indistinguishable from mono.
+        const bool isStereo = numChannels >= 2;
+        const auto laneHeight = isStereo ? bounds.getHeight() * 0.5f : bounds.getHeight();
+
+        for (int channel = 0; channel < (isStereo ? 2 : 1); ++channel)
         {
-            const int startSample = (int) ((float) x / (float) width * (float) numSamples);
-            const int endSample = juce::jmin (numSamples, (int) ((float) (x + 1) / (float) width * (float) numSamples) + 1);
+            const auto* channelData = data.getReadPointer (channel);
+            const auto laneTop = bounds.getY() + (float) channel * laneHeight;
+            const auto laneMidY = laneTop + laneHeight * 0.5f;
 
-            float minVal = 0.0f, maxVal = 0.0f;
-            for (int s = startSample; s < endSample; ++s)
+            for (int x = 0; x < width; ++x)
             {
-                minVal = juce::jmin (minVal, channelData[s]);
-                maxVal = juce::jmax (maxVal, channelData[s]);
-            }
+                const int startSample = (int) ((float) x / (float) width * (float) numSamples);
+                const int endSample = juce::jmin (numSamples, (int) ((float) (x + 1) / (float) width * (float) numSamples) + 1);
 
-            g.drawLine ((float) x, midY - maxVal * midY, (float) x, midY - minVal * midY);
+                float minVal = 0.0f, maxVal = 0.0f;
+                for (int s = startSample; s < endSample; ++s)
+                {
+                    minVal = juce::jmin (minVal, channelData[s]);
+                    maxVal = juce::jmax (maxVal, channelData[s]);
+                }
+
+                const auto halfLane = laneHeight * 0.5f;
+                g.drawLine ((float) x, laneMidY - maxVal * halfLane, (float) x, laneMidY - minVal * halfLane);
+            }
+        }
+
+        if (isStereo)
+        {
+            // Thin divider between the two lanes so they read as "two channels," not one
+            // waveform that happens to have a gap in it.
+            g.setColour (juce::Colours::darkgrey);
+            g.drawHorizontalLine ((int) (bounds.getY() + laneHeight), bounds.getX(), bounds.getRight());
         }
     }
 
