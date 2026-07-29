@@ -74,6 +74,8 @@ function cleanDisplayName (rawBasename)
         }
         if (/^beast?samples$/i.test (t))
             continue;
+        if (/^com$/i.test (t))
+            continue; // stray leftover when "Beastsamples.com" splits into two tokens
         if (/^\d{2,3}bpm$/i.test (t))
             continue;
         if (/^bpm$/i.test (t))
@@ -86,7 +88,10 @@ function cleanDisplayName (rawBasename)
         kept.push (t);
     }
 
-    const name = kept.join (' ').trim();
+    // Some packs concatenate words with no separator at all ("BassMellowGrooves",
+    // "ClassicGuitar") — split on a lowercase-to-uppercase boundary, the standard camelCase
+    // heuristic, since there's no other signal available to find the word breaks.
+    const name = kept.join (' ').replace (/([a-z])([A-Z])/g, '$1 $2').trim();
     const withIndex = indexNumber ? (name.length > 0 ? `${name} ${indexNumber}` : indexNumber) : name;
     return withIndex.length > 0 ? withIndex : rawBasename;
 }
