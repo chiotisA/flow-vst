@@ -46,11 +46,18 @@ public:
     // with proper pack/sample selection and multi-sample state.
     class FlowSamplerSound* getActiveSound() const;
 
-    void loadSample (const juce::File& file, int rootMidiNote);
+    void loadSample (const juce::File& file, int rootMidiNote, int nativeBpm = 0);
 
     // Fires after loadSample() swaps in a new FlowSamplerSound, so the editor can rebuild
     // its WaveformEditor to point at it.
     std::function<void()> onSampleLoaded;
+
+    // Real host tempo when available (VST3 in a DAW); falls back to manualBpm otherwise
+    // (Standalone has no host to report one). Updated once per block in processBlock,
+    // read by every FlowSamplerVoice to compute its time-stretch ratio.
+    std::atomic<double> hostBpm { 120.0 };
+    std::atomic<double> manualBpm { 120.0 };
+    void setManualBpm (double bpm) { manualBpm.store (bpm); }
 
 private:
     juce::AudioFormatManager formatManager;

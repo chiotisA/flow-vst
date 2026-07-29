@@ -75,6 +75,11 @@ juce_add_module("${CMAKE_CURRENT_SOURCE_DIR}/modules/melatonin_audio_sparklines"
 # Catch2 matchers/helpers for testing JUCE audio (silence/NaN/frequency checks etc), test-only
 add_subdirectory (modules/melatonin_test_helpers)
 
+# signalsmith-stretch: MIT, header-only time-stretch/pitch-shift DSP (used for host-BPM
+# tempo-sync). No CMakeLists.txt of its own — same "just add the parent dir" pattern as
+# melatonin_audio_sparklines above. Vendored (not CPM) since it isn't a registered CPM
+# package and pulls in signalsmith-linear as a nested dependency.
+
 # See `docs/CMake API.md` in the JUCE repo for all config options
 juce_add_plugin("${PROJECT_NAME}"
     # Icons for the standalone app
@@ -172,6 +177,11 @@ target_link_libraries(SharedCode
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags)
+
+# signalsmith-stretch is header-only with no CMake target — just needs its folder on the
+# include path so <signalsmith-stretch.h> (which itself includes "signalsmith-linear/stft.h"
+# relative to this same folder) resolves.
+target_include_directories(SharedCode INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/modules/signalsmith-stretch)
 
 # Link the JUCE plugin targets our SharedCode target
 target_link_libraries("${PROJECT_NAME}" PRIVATE SharedCode)

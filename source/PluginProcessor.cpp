@@ -16,13 +16,17 @@ PluginProcessor::PluginProcessor()
     formatManager.registerBasicFormats();
 
     for (int i = 0; i < 8; ++i)
-        synth.addVoice (new FlowSamplerVoice());
+    {
+        auto* voice = new FlowSamplerVoice();
+        voice->setHostBpmSource (&hostBpm);
+        synth.addVoice (voice);
+    }
 
     // Nothing loaded at startup — the catalog browser picks a sample. On a fresh clone
     // or CI, test_samples/ (gitignored, real Beastsamples content) won't exist either way.
 }
 
-void PluginProcessor::loadSample (const juce::File& file, int rootMidiNote)
+void PluginProcessor::loadSample (const juce::File& file, int rootMidiNote, int nativeBpm)
 {
     std::unique_ptr<juce::AudioFormatReader> reader (formatManager.createReaderFor (file));
 
@@ -33,7 +37,7 @@ void PluginProcessor::loadSample (const juce::File& file, int rootMidiNote)
     reader->read (&buffer, 0, buffer.getNumSamples(), 0, true, true);
 
     synth.clearSounds();
-    synth.addSound (new FlowSamplerSound (std::move (buffer), reader->sampleRate, rootMidiNote));
+    synth.addSound (new FlowSamplerSound (std::move (buffer), reader->sampleRate, rootMidiNote, nativeBpm));
 
     if (onSampleLoaded)
         onSampleLoaded();
@@ -119,8 +123,14 @@ void PluginProcessor::changeProgramName (int index, const juce::String& newName)
 //==============================================================================
 void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    juce::ignoreUnused (samplesPerBlock);
     synth.setCurrentPlaybackSampleRate (sampleRate);
+
+    // Pre-allocates the time-stretch engine's internal STFT buffers once here (message
+    // thread, safe to allocate) rather than on first use inside renderNextBlock (audio
+    // thread, must never allocate).
+    for (int i = 0; i < synth.getNumVoices(); ++i)
+        if (auto* voice = dynamic_cast<FlowSamplerVoice*> (synth.getVoice (i)))
+            voice->prepare (sampleRate, samplesPerBlock);
 }
 
 void PluginProcessor::releaseResources()
@@ -155,6 +165,15 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
+
+    // Real host tempo when hosted in a DAW; Standalone has no playhead to report one, so
+    // it falls back to manualBpm (set from the UI's Standalone-only BPM field).
+    double bpm = manualBpm.load();
+    if (auto* currentPlayHead = getPlayHead())
+        if (auto position = currentPlayHead->getPosition())
+            if (auto reportedBpm = position->getBpm())
+                bpm = *reportedBpm;
+    hostBpm.store (bpm);
 
     // Synthesiser voices add into the buffer, so it must start silent.
     buffer.clear();

@@ -12,8 +12,8 @@
 class FlowSamplerSound : public juce::SynthesiserSound
 {
 public:
-    FlowSamplerSound (juce::AudioBuffer<float> audioData, double sourceSampleRateIn, int rootMidiNoteIn)
-        : data (std::move (audioData)), sourceSampleRate (sourceSampleRateIn), rootMidiNote (rootMidiNoteIn)
+    FlowSamplerSound (juce::AudioBuffer<float> audioData, double sourceSampleRateIn, int rootMidiNoteIn, int nativeBpmIn = 0)
+        : data (std::move (audioData)), sourceSampleRate (sourceSampleRateIn), rootMidiNote (rootMidiNoteIn), nativeBpm (nativeBpmIn)
     {
         const auto numSamples = data.getNumSamples();
         trimStart.store (0);
@@ -39,6 +39,11 @@ public:
     std::atomic<int> trimStart, trimEnd;
     std::atomic<int> loopStart, loopEnd;
     std::atomic<bool> loopingEnabled { true };
+
+    // 0 means "unknown" — most One-Shots have no meaningful tempo, so the time-stretch
+    // toggle stays unavailable for those (nothing to compute a stretch ratio against).
+    const int nativeBpm;
+    std::atomic<bool> timeStretchEnabled { false };
 
     // Written by whichever FlowSamplerVoice is currently playing this sound, read by
     // WaveformEditor's timer to draw a live playhead. -1 means "not currently playing".
