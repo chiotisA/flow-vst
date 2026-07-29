@@ -1,58 +1,9 @@
 #include "WaveformEditor.h"
-#include "PitchDetector.h"
 
 WaveformEditor::WaveformEditor (FlowSamplerSound& soundToEdit) : sound (soundToEdit)
 {
     setInterceptsMouseClicks (true, false);
     startTimerHz (30);
-
-    rootNoteLabel.setColour (juce::Label::textColourId, juce::Colours::white);
-    addAndMakeVisible (rootNoteLabel);
-
-    rootDownButton.onClick = [this] { sound.rootMidiNote.fetch_sub (1); updateRootNoteLabel(); };
-    rootUpButton.onClick   = [this] { sound.rootMidiNote.fetch_add (1); updateRootNoteLabel(); };
-    addAndMakeVisible (rootDownButton);
-    addAndMakeVisible (rootUpButton);
-
-    // Runs on this (message) thread only, never the audio thread — a one-off analysis
-    // triggered by a click, not something in the realtime path.
-    detectPitchButton.onClick = [this]
-    {
-        const auto trimStart = sound.trimStart.load();
-        const auto trimEnd = sound.trimEnd.load();
-        const auto* channelData = sound.data.getReadPointer (0) + trimStart;
-
-        const auto freqHz = detectPitchYin (channelData, trimEnd - trimStart, sound.sourceSampleRate);
-
-        if (freqHz > 0.0)
-        {
-            sound.rootMidiNote.store (frequencyToMidiNote (freqHz));
-            updateRootNoteLabel();
-        }
-        else
-        {
-            rootNoteLabel.setText ("No pitch found", juce::dontSendNotification);
-        }
-    };
-    addAndMakeVisible (detectPitchButton);
-
-    updateRootNoteLabel();
-}
-
-void WaveformEditor::updateRootNoteLabel()
-{
-    const auto note = sound.rootMidiNote.load();
-    rootNoteLabel.setText ("Root: " + juce::MidiMessage::getMidiNoteName (note, true, true, 3),
-                            juce::dontSendNotification);
-}
-
-void WaveformEditor::resized()
-{
-    auto strip = getLocalBounds().removeFromTop (controlStripHeight);
-    detectPitchButton.setBounds (strip.removeFromRight (100));
-    rootUpButton.setBounds (strip.removeFromRight (28));
-    rootDownButton.setBounds (strip.removeFromRight (28));
-    rootNoteLabel.setBounds (strip);
 }
 
 float WaveformEditor::sampleToX (int sample) const
@@ -95,15 +46,6 @@ WaveformEditor::Marker WaveformEditor::findMarkerNear (float x) const
 
 void WaveformEditor::mouseDown (const juce::MouseEvent& e)
 {
-    // The control strip's own children (label/buttons) normally consume their clicks
-    // before this ever runs, but the label doesn't intercept clicks — without this guard,
-    // clicking it while it happens to sit above a marker's x-column would start a drag.
-    if (e.position.y < (float) controlStripHeight)
-    {
-        draggingMarker = Marker::none;
-        return;
-    }
-
     draggingMarker = findMarkerNear ((float) e.position.x);
 }
 
@@ -169,7 +111,7 @@ void WaveformEditor::mouseMove (const juce::MouseEvent& e)
 
 void WaveformEditor::paint (juce::Graphics& g)
 {
-    auto bounds = getLocalBounds().toFloat().withTrimmedTop ((float) controlStripHeight);
+    auto bounds = getLocalBounds().toFloat();
     g.setColour (juce::Colours::black);
     g.fillRect (bounds);
 
@@ -208,10 +150,10 @@ void WaveformEditor::paint (juce::Graphics& g)
     {
         const auto x = sampleToX (sample);
         g.setColour (colour);
-        g.drawLine (x, bounds.getY(), x, bounds.getBottom(), 2.0f);
+        g.drawLine (x, 0.0f, x, bounds.getHeight(), 2.0f);
 
         g.setFont (12.0f);
-        const auto labelY = labelAbove ? bounds.getY() + 2.0f : bounds.getBottom() - 16.0f;
+        const auto labelY = labelAbove ? 2.0f : bounds.getHeight() - 16.0f;
         const auto labelWidth = 70.0f;
         // Keep the label from running off either edge of the component.
         const auto labelX = juce::jlimit (0.0f, bounds.getWidth() - labelWidth, x - labelWidth * 0.5f);
@@ -227,6 +169,6 @@ void WaveformEditor::paint (juce::Graphics& g)
     if (playbackPosition >= 0)
     {
         g.setColour (juce::Colours::white);
-        g.drawLine (sampleToX (playbackPosition), bounds.getY(), sampleToX (playbackPosition), bounds.getBottom(), 2.0f);
+        g.drawLine (sampleToX (playbackPosition), 0.0f, sampleToX (playbackPosition), bounds.getHeight(), 2.0f);
     }
 }
