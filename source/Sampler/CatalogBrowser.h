@@ -23,13 +23,19 @@ private:
     void textEditorTextChanged (juce::TextEditor&) override { updateFilteredList(); }
 
     void updateFilteredList();
+    void setActiveMode (SampleMode newMode);
 
     juce::Array<SampleEntry> allEntries;
     juce::Array<int> filteredIndices;
     juce::StringArray favoriteFilePaths;
 
+    SampleMode activeMode = SampleMode::Loop;
+
+    juce::TextButton loopsTabButton { "Loops" };
+    juce::TextButton oneShotsTabButton { "One-Shots" };
     juce::TextEditor searchBox;
     juce::ListBox listBox { "Catalog", this };
 
     static constexpr int starColumnWidth = 24;
+    static constexpr int tabRowHeight = 26;
 };

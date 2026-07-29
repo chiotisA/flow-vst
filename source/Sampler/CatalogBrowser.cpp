@@ -4,6 +4,13 @@ CatalogBrowser::CatalogBrowser()
 {
     allEntries = buildTestCatalog();
 
+    loopsTabButton.setClickingTogglesState (false);
+    oneShotsTabButton.setClickingTogglesState (false);
+    loopsTabButton.onClick = [this] { setActiveMode (SampleMode::Loop); };
+    oneShotsTabButton.onClick = [this] { setActiveMode (SampleMode::OneShot); };
+    addAndMakeVisible (loopsTabButton);
+    addAndMakeVisible (oneShotsTabButton);
+
     searchBox.setTextToShowWhenEmpty ("Search name, category, key...", juce::Colours::grey);
     searchBox.addListener (this);
     addAndMakeVisible (searchBox);
@@ -11,14 +18,31 @@ CatalogBrowser::CatalogBrowser()
     listBox.setRowHeight (28);
     addAndMakeVisible (listBox);
 
-    updateFilteredList();
+    setActiveMode (activeMode);
 }
 
 void CatalogBrowser::resized()
 {
     auto area = getLocalBounds();
+    auto tabRow = area.removeFromTop (tabRowHeight);
+    loopsTabButton.setBounds (tabRow.removeFromLeft (tabRow.getWidth() / 2));
+    oneShotsTabButton.setBounds (tabRow);
     searchBox.setBounds (area.removeFromTop (28));
     listBox.setBounds (area);
+}
+
+void CatalogBrowser::setActiveMode (SampleMode newMode)
+{
+    activeMode = newMode;
+
+    // Tab acts as a single-active toggle, not multi-select — searching within Loops only
+    // ever returns Loops, same search under One-Shots only ever returns One-Shots.
+    loopsTabButton.setColour (juce::TextButton::buttonColourId,
+                               activeMode == SampleMode::Loop ? juce::Colours::darkslategrey : juce::Colours::black);
+    oneShotsTabButton.setColour (juce::TextButton::buttonColourId,
+                                  activeMode == SampleMode::OneShot ? juce::Colours::darkslategrey : juce::Colours::black);
+
+    updateFilteredList();
 }
 
 void CatalogBrowser::updateFilteredList()
@@ -29,6 +53,9 @@ void CatalogBrowser::updateFilteredList()
     for (int i = 0; i < allEntries.size(); ++i)
     {
         const auto& e = allEntries.getReference (i);
+
+        if (e.mode != activeMode)
+            continue;
 
         if (query.isEmpty()
             || e.name.toLowerCase().contains (query)
@@ -66,7 +93,8 @@ void CatalogBrowser::paintListBoxItem (int rowNumber, juce::Graphics& g, int wid
     g.setColour (entry.locked ? juce::Colours::grey : juce::Colours::white);
     g.setFont (13.0f);
 
-    auto label = entry.name + "  [" + entry.category + " - " + entry.key + " - " + juce::String (entry.bpm) + " bpm]"
+    auto label = entry.name + "  [" + entry.category + " - " + entry.key
+               + (entry.bpm > 0 ? " - " + juce::String (entry.bpm) + " bpm]" : "]")
                + (entry.locked ? "  (locked)" : "");
     g.drawText (label, textArea.reduced (4, 0), juce::Justification::centredLeft, true);
 }

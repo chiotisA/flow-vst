@@ -56,6 +56,16 @@ inline juce::Array<SampleEntry> buildTestCatalog()
     entries.add ({ catalogDir.getChildFile ("Brass_Dmin_130bpm.wav"),    "Phantasia Brass #10",   "Brass",     SampleMode::Loop, "Dmin",  130, false });
     entries.add ({ catalogDir.getChildFile ("Brass_Gsmin_160bpm.wav"),   "Phantasia Brass #12",   "Brass",     SampleMode::Loop, "G#min", 160, true  });
 
+    // One-Shots (added 2026-07-29) — no BPM, and no key tag either since these packs were
+    // never key-labelled at the source. Key stays "-" (unknown) until pitch-detection can
+    // derive a real root from the actual audio; that's the concrete next feature to build.
+    entries.add ({ catalogDir.getChildFile ("OneShot_SynthBass_01.wav"), "Synth Bass #1",  "Bass",  SampleMode::OneShot, "-", 0, false });
+    entries.add ({ catalogDir.getChildFile ("OneShot_SynthBass_05.wav"), "Synth Bass #5",  "Bass",  SampleMode::OneShot, "-", 0, false });
+    entries.add ({ catalogDir.getChildFile ("OneShot_SynthBass_12.wav"), "Synth Bass #12", "Bass",  SampleMode::OneShot, "-", 0, true  });
+    entries.add ({ catalogDir.getChildFile ("OneShot_SynthBass_20.wav"), "Synth Bass #20", "Bass",  SampleMode::OneShot, "-", 0, true  });
+    entries.add ({ catalogDir.getChildFile ("OneShot_Kick_01.wav"),      "Dragon Kick #1",  "Drums", SampleMode::OneShot, "-", 0, false });
+    entries.add ({ catalogDir.getChildFile ("OneShot_Snare_01.wav"),     "Dragon Snare #1", "Drums", SampleMode::OneShot, "-", 0, false });
+
     return entries;
 }
 
