@@ -13,12 +13,17 @@ public:
     explicit WaveformEditor (FlowSamplerSound& soundToEdit);
 
     void paint (juce::Graphics&) override;
+    void resized() override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseMove (const juce::MouseEvent&) override;
 
 private:
     void timerCallback() override { repaint(); }
+    void updateRootNoteLabel();
+
+    // Everything below this height is the actual waveform/markers; the strip itself is
+    // real child components (label + buttons), so clicks there never reach mouseDown().
 
     enum class Marker { none, trimStart, trimEnd, loopStart, loopEnd };
 
@@ -34,5 +39,11 @@ private:
     FlowSamplerSound& sound;
     Marker draggingMarker = Marker::none;
 
+    juce::Label rootNoteLabel;
+    juce::TextButton rootDownButton { "-" };
+    juce::TextButton rootUpButton { "+" };
+    juce::TextButton detectPitchButton { "Detect Pitch" };
+
     static constexpr int grabRadius = 6;
+    static constexpr int controlStripHeight = 24;
 };

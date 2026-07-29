@@ -29,7 +29,11 @@ public:
 
     const juce::AudioBuffer<float> data;
     const double sourceSampleRate;
-    const int rootMidiNote;
+
+    // Mutable (unlike data/sourceSampleRate above) so the "Detect Pitch" button can
+    // re-derive this from the actual trimmed audio without reloading the sample. Written
+    // by the message thread, read once per note-start by the audio thread.
+    std::atomic<int> rootMidiNote;
 
     std::atomic<int> trimStart, trimEnd;
     std::atomic<int> loopStart, loopEnd;
