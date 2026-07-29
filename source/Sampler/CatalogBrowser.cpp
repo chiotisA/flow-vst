@@ -48,6 +48,11 @@ CatalogBrowser::CatalogBrowser()
     listBox.setRowHeight (28);
     addAndMakeVisible (listBox);
 
+    // Starts hidden — addChildComponent (not addAndMakeVisible) so it exists in the
+    // hierarchy but doesn't show until updateSuggestions() has real matches to display.
+    suggestionsListBox.setRowHeight (suggestionRowHeight);
+    addChildComponent (suggestionsListBox);
+
     setActiveMode (activeMode);
 }
 
@@ -65,8 +70,14 @@ void CatalogBrowser::resized()
     bpmMinBox.setBounds (keyBpmRow.removeFromLeft (keyBpmRow.getWidth() / 2));
     bpmMaxBox.setBounds (keyBpmRow);
 
-    searchBox.setBounds (area.removeFromTop (28));
+    auto searchArea = area.removeFromTop (28);
+    searchBox.setBounds (searchArea);
     listBox.setBounds (area);
+
+    // Overlays the top of the main list, directly under the search box — bring to front
+    // only when actually shown (see updateSuggestions()).
+    const auto suggestionsHeight = juce::jmin (maxSuggestions, suggestionIndices.size()) * suggestionRowHeight;
+    suggestionsListBox.setBounds (area.withHeight (juce::jmax (suggestionRowHeight, suggestionsHeight)));
 }
 
 void CatalogBrowser::setActiveMode (SampleMode newMode)
@@ -130,6 +141,83 @@ void CatalogBrowser::updateFilteredList()
 
     listBox.updateContent();
     listBox.repaint();
+}
+
+void CatalogBrowser::textEditorTextChanged (juce::TextEditor&)
+{
+    updateFilteredList();
+    updateSuggestions();
+}
+
+void CatalogBrowser::updateSuggestions()
+{
+    const auto query = searchBox.getText().toLowerCase();
+    suggestionIndices.clear();
+
+    // Deliberately searches the WHOLE catalog, ignoring Mode/Category/Key/BPM — the point
+    // is to surface something even when the current filters would otherwise hide it with
+    // zero explanation (e.g. searching "arp" while on One-Shots, when every Arp is Loop).
+    if (query.isNotEmpty())
+    {
+        for (int i = 0; i < allEntries.size() && suggestionIndices.size() < maxSuggestions; ++i)
+        {
+            const auto& e = allEntries.getReference (i);
+            if (e.name.toLowerCase().contains (query)
+                || e.category.toLowerCase().contains (query)
+                || e.key.toLowerCase().contains (query))
+            {
+                suggestionIndices.add (i);
+            }
+        }
+    }
+
+    suggestionsListBox.setVisible (! suggestionIndices.isEmpty());
+    suggestionsListBox.toFront (false);
+    suggestionsListBox.updateContent();
+    resized();
+}
+
+void CatalogBrowser::selectSuggestion (int suggestionRow)
+{
+    if (! juce::isPositiveAndBelow (suggestionRow, suggestionIndices.size()))
+        return;
+
+    const auto& entry = allEntries.getReference (suggestionIndices[suggestionRow]);
+
+    if (entry.locked)
+        return; // Not purchased — task 6 (licensing) wires up the real unlock flow.
+
+    // Switch the browsing context to match, so the user can see where this result
+    // actually lives rather than it just appearing to teleport in from nowhere.
+    setActiveMode (entry.mode);
+    categoryFilterBox.setText (entry.category, juce::dontSendNotification);
+
+    hideSuggestions();
+
+    if (onSampleSelected)
+        onSampleSelected (entry);
+}
+
+void CatalogBrowser::hideSuggestions()
+{
+    suggestionsListBox.setVisible (false);
+}
+
+void CatalogBrowser::SuggestionsModel::paintListBoxItem (int row, juce::Graphics& g, int w, int h, bool selected)
+{
+    if (! juce::isPositiveAndBelow (row, owner.suggestionIndices.size()))
+        return;
+
+    const auto& entry = owner.allEntries.getReference (owner.suggestionIndices[row]);
+
+    g.fillAll (selected ? juce::Colours::darkslategrey : juce::Colours::black.withAlpha (0.95f));
+    g.setColour (entry.locked ? juce::Colours::grey : juce::Colours::white);
+    g.setFont (12.0f);
+
+    auto label = entry.name + "  ["
+               + (entry.mode == SampleMode::Loop ? juce::String ("Loop") : juce::String ("One-Shot"))
+               + " - " + entry.category + "]";
+    g.drawText (label, juce::Rectangle<int> (0, 0, w, h).reduced (4, 0), juce::Justification::centredLeft, true);
 }
 
 int CatalogBrowser::getNumRows()
